@@ -2,7 +2,7 @@
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
 Created          : 05-03-2021
-Modified         : 30-09-2026 [WRITE THE DATE!!!!]
+Modified         : 30-09-2026
 Language/ver     : C++ in VS Code
 
 Description      : External Interrupt (EXTI) configuration and control
@@ -14,9 +14,9 @@ Description      : External Interrupt (EXTI) configuration and control
 #include "stm32f411xe.h"
 #include "ecPinNames.h"
 
-#define FALL 0
-#define RISE 1
-#define BOTH 2
+#define FALL (int)(0)
+#define RISE (int)(1)
+#define BOTH (int)(2)
 
 #ifdef __cplusplus
  extern "C" {
@@ -27,6 +27,8 @@ void EXTI_enable(PinName_t pinName);
 void EXTI_disable(PinName_t pinName);
 uint32_t is_pending_EXTI(PinName_t pinName);
 void clear_pending_EXTI(PinName_t pinName);
+
+void led_toggle(PinName_t pinName);
 
 #ifdef __cplusplus
 }

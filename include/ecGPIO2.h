@@ -21,11 +21,11 @@ Description      : GPIO Library. Distributed to Students for LAB_GPIO
 #define AF     0x02
 #define ANALOG 0x03
 
-#define HIGH 1
-#define LOW  0
+#define HIGH (int)(1)
+#define LOW  (int)(0)
 
-#define LED_PIN 	PA_5
-#define BUTTON_PIN  PC_13
+// #define LED_PIN 	PA_5
+// #define BUTTON_PIN  PC_13
 
 /*---------------------------------------------------------------- 
                     [EXERCISE]
