@@ -2,7 +2,7 @@
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
 Created          : 05-03-2021
-Modified         : 16-09-2026 
+Modified         : 22-09-2026 
 Language/ver     : C++ in VS Code
 
 Description      : System Clock Library. Distributed to Students for LAB_GPIO
@@ -32,7 +32,20 @@ void RCC_HSI_init() {
 }
 
 void RCC_HSE_init(){
+	// Enable High Speed External Clock (HSE = 8 MHz)
+	RCC->CR |= ((uint32_t)RCC_CR_HSEON);	
 	
+	// wait until HSE is ready
+	while ( (RCC->CR & (uint32_t)RCC_CR_HSERDY) == 0) {;}
+
+	// Select HSE as system clock source
+	RCC->CFGR &= (uint32_t)(~RCC_CFGR_SW);
+	RCC->CFGR |= (uint32_t)RCC_CFGR_SW_HSE;
+
+	// Wait until HSE is used as system clock source
+	while ((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != RCC_CFGR_SWS_HSE ) {;}
+
+	EC_SYSCLK = 8000000;
 }
 
 void RCC_PLL_init() {	

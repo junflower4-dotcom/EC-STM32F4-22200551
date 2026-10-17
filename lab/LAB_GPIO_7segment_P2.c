@@ -19,34 +19,53 @@ PinName_t selectFND[4] = {PA_10, PA_11, PC_4, PC_3};
 
 void setup(void){
     
+    // Intialize System Clock
+    RCC_HSI_init();    
+
     // Button Intialize
     GPIO_init(BUTTON_PIN, INPUT);
     GPIO_pupd(BUTTON_PIN, PU);
 
-    // Intialize System Clock
-    RCC_HSI_init();    
-    // Intialize FND pins and Others
+    // Intialize segment and display selection pins
     FND_init(pinFND);
     FND_select_init(selectFND);    
-    // Intialize  Others
-    // [YOUR CODE GOES HERE]
+    
+    // Select FND0 and display the initial number 0
+    FND_select(0);
+    FND_display(0);
 
 };
 
 int main(void) {
+
     setup();
-    uint8_t numDisplay1  = 0;
-    uint8_t numDisplay2  = 5;
-    uint8_t selectFND1  = 0;
-    uint8_t selectFND2  = 1;
+
+    uint8_t num = 0;
 
     while (1) {
-        FND_select(selectFND1);
-        FND_display(numDisplay1);
-        delay_ms_HSI(1);             		
-        FND_select(selectFND2);
-        FND_display(numDisplay2);
-        delay_ms_HSI(1);	
+
+        if(GPIO_read(BUTTON_PIN) == LOW){
+            
+            delay_ms_HSI(20);
+
+            if(GPIO_read(BUTTON_PIN) == LOW){
+                
+                num++;
+                
+                if(num > 9)
+                    num = 0;
+
+                FND_display(num);
+
+                
+                while (GPIO_read(BUTTON_PIN) == LOW){}
+
+                delay_ms_HSI(20);
+                
+            }
+        }
+
     }
+
 }
 

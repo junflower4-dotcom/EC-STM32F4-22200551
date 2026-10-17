@@ -21,14 +21,12 @@ void setup(void){
     // Intialize FND pins and Others
     FND_init(pinFND);
     FND_select_init(selectFND);    
-    // Intialize  Others
-    // [YOUR CODE GOES HERE]    
 };
 
 int main(void) {
     setup();
     uint8_t numDisplay1  = 0;
-    uint8_t numDisplay2  = 7;
+    uint8_t numDisplay2  = 5;
     uint8_t selectFND1  = 0;
     uint8_t selectFND2  = 1;
 
