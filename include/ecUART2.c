@@ -6,10 +6,11 @@ Created          : 10-08-2026
 Modified         : 10-08-2026
 Language/ver     : C in VS Code
 
-Description      : USART2  library
+Description      : Register-level USART library for STM32F411, including GPIO
+                   alternate-function setup, baud-rate configuration, and TX/RX.
 /----------------------------------------------------------------*/
 
-#include "ecUART2_student.h"
+#include "ecUART2.h"
 
 
 // ********************** DO NOT MODIFY HERE ***************************
@@ -74,9 +75,10 @@ void USART_init(USART_TypeDef* USARTx, PinName_t pin_GPIO_TX, PinName_t pin_GPIO
 	USARTx->CR1 &= ~USART_CR1_UE; 	// USART disable
 
 	// No Parity / 8-bit word length / Oversampling x16 / Stop bit =1
-  // [YOUR CODE HERE] 
-  // [YOUR CODE HERE] 
-  // [YOUR CODE HERE] 
+	USARTx->CR1 &= ~USART_CR1_M; 
+	USARTx->CR1 &= ~USART_CR1_PCE;
+	USARTx->CR1 &= ~USART_CR1_OVER8;
+	USARTx->CR2 &= ~USART_CR2_STOP;
 
 	// Set Baudrate using APB frequency (42MHz)
 	// If oversampling by 16, Tx/Rx baud = f_CK / (16*USARTDIV),
@@ -93,8 +95,12 @@ void USART_init(USART_TypeDef* USARTx, PinName_t pin_GPIO_TX, PinName_t pin_GPIO
   // USART_IRQn
 	uint32_t USART_IRQ = USART2_IRQn;
   // Set the priority and enable interrupt
-  // [YOUR CODE HERE] 
-  // [YOUR CODE HERE] 
+	if (USARTx == USART1) {
+		USART_IRQ = USART1_IRQn;
+	}
+	else if (USARTx == USART6) {
+		USART_IRQ = USART6_IRQn;
+	}
  
 	NVIC_SetPriority(USART_IRQ, 1);
 	NVIC_EnableIRQ(USART_IRQ);
@@ -111,16 +117,20 @@ void USART_baud(USART_TypeDef* USARTx, uint32_t baud){
 	float fCK = EC_SYSCLK;                                   // if(USARTx==USART1 || USARTx==USART6), APB2
 	                                                         // (84MHz after RCC_PLL_init(), 16MHz after RCC_HSI_init())
 	if(USARTx == USART2) fCK =fCK/2;      // APB1
-  float USARTDIV = (float) fCK/16.0/baud;
+    float USARTDIV = (float) fCK/16.0/baud;
 
 	// Method 1 : build the two BRR fields explicitly
 	//   BRR[15:4] = DIV_Mantissa (integer part of USARTDIV)
 	//   BRR[3:0]  = DIV_Fraction (counts 1/16 steps -> multiply the fraction by 16)
-  //[YOUR CODE HERE]
-  //[YOUR CODE HERE]
-  //[YOUR CODE HERE]
-  // USARTx->BRR = _______________ 
+	uint32_t DIV_Mantissa = (uint32_t)USARTDIV;
+	uint32_t DIV_Fraction = round((USARTDIV - DIV_Mantissa)*16);
 
+	if (DIV_Fraction >= 16) {
+		DIV_Mantissa++;
+		DIV_Fraction = 0;
+	}
+
+	USARTx->BRR = ((DIV_Mantissa<<4) | DIV_Fraction);
   
 	// Enable TX, RX, and USARTx
 	USARTx->CR1 |= USART_CR1_UE;
@@ -138,26 +148,39 @@ void USART_pins(USART_TypeDef* USARTx, PinName_t pin_GPIO_TX, PinName_t pin_GPIO
 	ecPinmap(pin_GPIO_RX, &GPIO_RX, &pinRX);
 
 	// Alternate Function, Push-Pull, No Pull-up/down, High speed
-	// [YOUR CODE HERE]
-  // [YOUR CODE HERE]
-  // [YOUR CODE HERE]
-  // [YOUR CODE HERE]
+	// TX Pin
+  	GPIO_init(pin_GPIO_TX, AF);
+	GPIO_otype(pin_GPIO_TX, PUSH_PULL);
+	GPIO_pupd(pin_GPIO_TX, NO_PUPD);
+	GPIO_ospeed(pin_GPIO_TX, HIGH_SPEED);
+
+	// RX Pin
+	GPIO_init(pin_GPIO_RX, AF);
+	GPIO_otype(pin_GPIO_RX, PUSH_PULL);
+	GPIO_pupd(pin_GPIO_RX, NO_PUPD);
+	GPIO_ospeed(pin_GPIO_RX, HIGH_SPEED);
 
 	// Set Alternate Function Register for USARTx
 	//   AF7 - USART1, USART2
 	//   AF8 - USART6
 	uint32_t AF_num = (USARTx == USART6) ? 8 : 7;
-	if (pinTX < 8) { GPIO_TX->AFR[0] &= ~(0xFUL << (4*pinTX));     GPIO_TX->AFR[0] |= AF_num << (4*pinTX); }
-	else           { GPIO_TX->AFR[1] &= ~(0xFUL << (4*(pinTX-8))); GPIO_TX->AFR[1] |= AF_num << (4*(pinTX-8)); }
+	if (pinTX < 8) { 
+		GPIO_TX->AFR[0] &= ~(0xFUL << (4*pinTX));     
+		GPIO_TX->AFR[0] |= AF_num << (4*pinTX); 
+	}
+	else { 
+		GPIO_TX->AFR[1] &= ~(0xFUL << (4*(pinTX-8))); 
+		GPIO_TX->AFR[1] |= AF_num << (4*(pinTX-8)); 
+	}
 	
-  if (pinRX < 8) {
-    // [YOUR CODE HERE] 
-    // [YOUR CODE HERE] 
-  }
-  else{
-    // [YOUR CODE HERE] 
-    // [YOUR CODE HERE]   
-  }
+  	if (pinRX < 8) {
+    	GPIO_RX->AFR[0] &= ~(0xFUL << (4 * pinRX));
+    	GPIO_RX->AFR[0] |= (AF_num << (4 * pinRX));
+  	}
+  	else {
+    	GPIO_RX->AFR[1] &= ~(0xFUL << (4 * (pinRX - 8)));
+   		GPIO_RX->AFR[1] |= (AF_num << (4 * (pinRX - 8)));  
+  	}
 
 }
 
@@ -241,7 +264,7 @@ void USART1_init(void){
   //    USARTDIV = f_APB1 / (16 x baud)
   //    USART_baud(USARTx, 9600);
   uint32_t baud=  9600;				// Default baud rate for USART2
-  float fCK      = (float)EC_SYSCLK / 2;		// APB1 : 84MHz PLL -> 42MHz
+  float fCK      = (float)EC_SYSCLK;		// APB1 : 84MHz PLL -> 42MHz
   float USARTDIV = fCK / 16 / baud;
   uint32_t MNT   = (uint32_t)USARTDIV;
   uint32_t FRC   = round((USARTDIV - MNT) * 16);

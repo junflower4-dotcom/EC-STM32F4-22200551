@@ -5,7 +5,8 @@ Created          : 10-08-2025
 Modified         : 10-08-2026 
 Language/ver     : C in VS Code
 
-Description      : USART2  library  [your description here] 
+Description      : Register-level USART interface for STM32F411, declaring
+                   initialization, baud-rate, GPIO pin, TX/RX, and status APIs. 
 /----------------------------------------------------------------*/
 
 #ifndef __EC_USART2_STUDENT_H

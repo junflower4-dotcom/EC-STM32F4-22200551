@@ -1,50 +1,45 @@
 /*----------------------------------------------------------------\
 @ Embedded Controller by Young-Keun Kim - Handong Global University
-Author           : [ YOUR NAME GOES HERE !!!!!]
+Author           : [Yejun Lee]
 Created          : 10-08-2026
-Modified         : 00-00-2026 [WRITE THE DATE!!!!]
+Modified         : 18-10-2026 
 Language/ver     : C in VS Code
 
 Description      : Tutorial - USART2 with the STUDENT library (ecUART2_student)
 /----------------------------------------------------------------*/
 #include <stdio.h>
-#include <string.h>
-
 #include "stm32f4xx.h"
-#include "ecGPIO2.h"
 #include "ecRCC2.h"
 #include "ecSysTick2.h"
-#include "ecUART2_student.h"
+#include "ecGPIO2.h"
+#include "ecUART2.h"
 
-uint8_t PC_string[] = "Hello Handong\r\n";
-uint8_t BT_string[20]={0};
 
-uint32_t loop=0;
+uint8_t PC_data = 0;
 
 // Initialiization 
-void setup(void)
-{
+void setup(void){	
 	RCC_PLL_init();
 	SysTick_init();
+	// USART2: USB serial init
 	USART2_init();
 }
 
 int main(void) {
 	// Initialiization --------------------------------------------------------
 	setup();
-
-	// Method 1 : printf() 
 	printf("MCU Initialized\r\n");
-
-	// Method 2 : USART_write() 
-	USART2_write(PC_string, sizeof(PC_string));
-
 	// Inifinite Loop ----------------------------------------------------------
-	while (1){
-		// Method 3 :  Combination of string and number
-		int n = sprintf((char*)BT_string, "Loop: %lu >> \r\n", loop);  
-		USART2_write(BT_string, n);		
-		loop++;
-		delay_ms(2000);  
+	while(1){		
+		delay_ms(2000);        
+	}
+}
+
+
+// ECHO keyboard inputs
+void USART2_IRQHandler(){        // USART2 RX Interrupt : Recommended
+	if(is_USART2_RXNE()){
+		PC_data = USART2_read();		// RX from UART2 (PC)
+		USART2_write(&PC_data,1);		// TX to USART2	 (PC)	 Echo of keyboard typing		
 	}
 }

@@ -15,6 +15,8 @@ Description      : STM32F411 Library for EC
 #ifndef __EC_STM_H
 #define __EC_STM_H
 
+#include <stdio.h>
+#include <stdint.h>
 // STM built-In Library
 #include "stm32f4xx.h"
 #include "stm32f411xe.h"
@@ -30,7 +32,7 @@ Description      : STM32F411 Library for EC
 //#include "ecPWM2.h"
 #include "ecStepper.h"
 //#include "ecADC2.h"
-//#include "ecUART2.h"
+#include "ecUART2.h"
 
 // #define LED_PIN_NUCLEO 
 
