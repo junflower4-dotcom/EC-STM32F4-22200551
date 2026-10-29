@@ -2,7 +2,7 @@
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
 Created          : 18-10-2026
-Modified         : 18-10-2026 
+Modified         : 20-10-2026 
 Language/ver     : C in VS Code
 
 Description      :LAB_USART_LED - Bidirectional communication between two MCUs using USART1 and USART2.
