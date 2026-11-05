@@ -5,7 +5,7 @@
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
 Created          : 05-03-2021
-Modified         : 01-10-2026 
+Modified         : 10-01-2026 
 Language/ver     : C++ in VS Code
 
 Description      : STM32F411 Library for EC
@@ -28,8 +28,8 @@ Description      : STM32F411 Library for EC
 #include "ecGPIO2.h"
 #include "ecEXTI2.h"
 #include "ecSysTick2.h"
-//#include "ecTIM2.h"
-//#include "ecPWM2.h"
+#include "ecTIM2.h"
+#include "ecPWM2.h"
 #include "ecStepper.h"
 //#include "ecADC2.h"
 #include "ecUART2.h"
