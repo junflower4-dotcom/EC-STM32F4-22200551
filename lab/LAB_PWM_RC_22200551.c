@@ -3,7 +3,7 @@
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
 Created          : 02-11-2026
-Modified         : 02-11-2026
+Modified         : 08-11-2026
 Language/ver     : C in VS Code
 
 Description      : LAB_PWM_RC - RC Servo Motor Control
@@ -15,8 +15,8 @@ Description      : LAB_PWM_RC - RC Servo Motor Control
 #include "ecSTM32F4v2.h"
 
 // Pin Configuration
-#define PWM_PIN       PA_1
-#define BUTTON_PIN    PC_13
+#define PWM_PIN       PA_1       // TIM2_CH2
+#define BUTTON_PIN    PC_13      // B1 USER Button
 
 // Servo Configuration
 #define SERVO_MIN     0
@@ -34,17 +34,6 @@ void setup(void);
 void Servo_setAngle(int angle);
 
 
-// Main Function
-int main(void){
-
-    setup();
-
-    while(1){
-        // Servo control is handled by interrupts
-    }
-}
-
-
 // Initialization
 void setup(void){
 
@@ -59,16 +48,26 @@ void setup(void){
     Servo_setAngle(0);
 
     // 3. USER Button: PC13 Input, Pull-Up
-    GPIO_init(BUTTON_PIN, PU);
-
-    GPIOC->PUPDR &= ~(3UL << (2 * 13));
-    GPIOC->PUPDR |=  (1UL << (2 * 13));
+    GPIO_init(BUTTON_PIN, INPUT);
+    GPIO_pupd(BUTTON_PIN, PU);
 
     // 4. External Interrupt: Falling Edge
     EXTI_init(BUTTON_PIN, FALL, 0);
+    clear_pending_EXTI(BUTTON_PIN);
 
     // 5. Timer Update Interrupt: TIM3, 500 ms
     TIM_UI_init(TIM3, 500);
+}
+
+
+// Main Function
+int main(void){
+
+    setup();
+
+    while(1){
+        // Servo control is handled by interrupts
+    }
 }
 
 
@@ -76,14 +75,20 @@ void setup(void){
 void Servo_setAngle(int angle){
 
     // Limit Angle Range
-    if(angle < SERVO_MIN) angle = SERVO_MIN;
-    if(angle > SERVO_MAX) angle = SERVO_MAX;
+    if(angle < SERVO_MIN){
+        angle = SERVO_MIN;
+    }
+    if(angle > SERVO_MAX){
+        angle = SERVO_MAX;
+    }
 
     // Convert Angle to Pulse Width (us)
     uint32_t pulse_width =
         PULSE_MIN_US +
-        (uint32_t)(angle * (PULSE_MAX_US - PULSE_MIN_US)
-        / SERVO_MAX);
+        (uint32_t)(
+            angle * (PULSE_MAX_US - PULSE_MIN_US)
+            / SERVO_MAX
+        );
 
     // Update PWM Pulse Width
     PWM_pulsewidth_us(PWM_PIN, pulse_width);
@@ -102,10 +107,12 @@ void TIM3_IRQHandler(void){
 
         // Change Direction at Limits
         if(servo_angle >= SERVO_MAX){
+
             servo_angle = SERVO_MAX;
             direction = -1;
         }
         else if(servo_angle <= SERVO_MIN){
+
             servo_angle = SERVO_MIN;
             direction = 1;
         }
@@ -116,22 +123,24 @@ void TIM3_IRQHandler(void){
 }
 
 
-// External Interrupt Handler: USER Button
+// External Interrupt Handler: B1 USER Button
 void EXTI15_10_IRQHandler(void){
 
     if(is_pending_EXTI(BUTTON_PIN)){
 
+        // Clear EXTI Pending Flag
         clear_pending_EXTI(BUTTON_PIN);
 
         // Reset Servo State
         servo_angle = 0;
         direction = 1;
 
-        // Reset Servo Position
+        // Reset Servo Position to 0 deg
         Servo_setAngle(0);
 
-        // Restart 500 ms Timer Interval
+        // Restart TIM3 500 ms Interval
         TIM3->CNT = 0;
+
         clear_UIF(TIM3);
         NVIC_ClearPendingIRQ(TIM3_IRQn);
     }
