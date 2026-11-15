@@ -2,150 +2,231 @@
 /*----------------------------------------------------------------\
 @ Embedded Controller by Young-Keun Kim - Handong Global University
 Author           : [Yejun Lee]
-Created          : 05-11-2026
-Modified         : 05-11-2026
+Created          : 11-05-2026
+Modified         : 11-10-2026
 Language/ver     : C in VS Code / PlatformIO
 
 Description      : LAB_TIMER_ICAP - Ultrasonic Distance Sensor (HC-SR04)
-                   TIM3_CH1 (PA6): 50 ms period, 10 us TRIG pulse
+                   TIM3_CH1 (PA6): 100 ms  period, 10 us TRIG pulse
                    TIM4_CH1 (PB6): IC1 rising / IC2 falling ECHO capture
                    USART2: output measured pulse width and distance
 /----------------------------------------------------------------*/
 
 #include "ecSTM32F4v2.h"
-#include <stdint.h>
-#include <stdio.h> 
 
-#define TRIG_PIN          PA_6
-#define ECHO_PIN          PB_6
-#define LED_PIN           PA_5
+// Pin Definitions
+#define TRIG_PIN    PA_6
+#define ECHO_PIN    PB_6
+#define LED_PIN     PA_5
 
-#define PWM_PERIOD_MS     50U
-#define ECHO_TICK_US      10U
-#define MAX_ECHO_US       25000U
+// Timer Settings
+#define ECHO_TICK_US       10U
+#define ECHO_TIMEOUT_MS    30U
+#define NO_ECHO_TIMEOUT_MS 200U
+#define MAX_ECHO_TICKS     3000U
 
-volatile uint32_t echo_ticks = 0U;
-volatile uint8_t  measurement_ready = 0U;
+// Global Variables
+volatile uint16_t rising_cnt  = 0;
+volatile uint16_t falling_cnt = 0;
+volatile uint16_t echo_ticks  = 0;
+volatile uint8_t echo_ready   = 0;
 
-static volatile uint32_t rising_capture = 0U;
-static volatile uint8_t  rising_seen = 0U;
-static uint32_t timer_period_ticks = 65536U;
+// Timeout Variables
+volatile uint8_t rising_detected = 0;
+volatile uint32_t rising_ms = 0;
+
+
+// Function Declaration
+void setup(void);
+
+
+// =================== SETUP ===================
 
 void setup(void)
 {
-    // 1. System clock, LED and UART
-    RCC_PLL_init();
-    SysTick_init();
+    // 1. MCU Initialization
+    MCU_init();
+
+    // 2. LED Initialization
     GPIO_init(LED_PIN, OUTPUT);
-    USART_init(USART2, PA_2, PA_3, 9600);
 
-    // 2. TRIG: 50 ms period with 10 us HIGH pulse
-    // Duty = 10 / 50000 = 0.0002 (0.02%)
-    PWM_init(TRIG_PIN, PWM_PERIOD_MS);
-    PWM_duty(TRIG_PIN, 0.0002f);
+    // 3. USART2 Initialization
+    USART2_init();
 
-    // 3. ECHO: Rising and Falling edge capture
+    // Disable unused RX interrupt
+    USART2->CR1 &= ~USART_CR1_RXNEIE;
+    NVIC_DisableIRQ(USART2_IRQn);
+
+    // 4. TIM4 Input Capture Initialization
+    // CH1: Rising Edge
     ICAP_init(ECHO_PIN, IC_RISE);
+
+    // CH2: Falling Edge
     ICAP_ICn_init(ECHO_PIN, IC_FALL, IC_2);
+
+    // TIM4 Counter Tick = 10 us
     ICAP_tick(ECHO_PIN, ECHO_TICK_US);
 
-    timer_period_ticks = TIM4->ARR + 1U;
+    // 5. TIM3 PWM Initialization
+    PWM_init(TRIG_PIN, 100);
+
+    // Stop TIM3
+    TIM3->CR1 &= ~TIM_CR1_CEN;
+
+    // Configure Timer
+    // f_TIM = 84 MHz
+    // f_CNT = 100 kHz
+    TIM3->PSC  = 839;
+
+    // PWM Period = 100 ms
+    TIM3->ARR  = 9999;
+
+    // HIGH Pulse Width = 10 us
+    TIM3->CCR1 = 1;
+
+    // Apply updated settings
+    TIM3->EGR = TIM_EGR_UG;
+    TIM3->SR  = ~TIM_SR_UIF;
+    TIM3->CNT = 0;
+
+    // Restart TIM3
+    TIM3->CR1 |= TIM_CR1_CEN;
 }
+
+
+// =================== MAIN ===================
 
 int main(void)
 {
-    uint32_t ticks_snapshot;
-    uint32_t pulse_us;
-    uint32_t distance_centi_cm;
-    uint8_t has_measurement;
-
     setup();
 
-    printf("\r\n=== LAB_TIMER_ICAP: HC-SR04 ===\r\n");
-    printf("TRIG: PA6 (D12), ECHO: PB6 (D10)\r\n");
-    printf("PWM period: 50 ms, TRIG pulse: 10 us\r\n");
+    uint32_t last_valid_ms = msTicks;
 
-    while (1)
+    while(1)
     {
-        // Read ISR-updated variables together
+        uint8_t new_echo = 0;
+        uint8_t pulse_timeout = 0;
+        uint16_t ticks = 0;
+
+        // Critical Section
+        uint32_t primask = __get_PRIMASK();
         __disable_irq();
-        has_measurement = measurement_ready;
-        ticks_snapshot = echo_ticks;
-        measurement_ready = 0U;
-        __enable_irq();
 
-        if (has_measurement)
+        uint32_t now = msTicks;
+
+        // 1. Check new ECHO measurement
+        if(echo_ready)
         {
-            pulse_us = ticks_snapshot * ECHO_TICK_US;
-
-            // Distance[cm] ~= Echo time[us] / 58
-            // Calculate in 0.01 cm units
-            distance_centi_cm = (pulse_us * 100U + 29U) / 58U;
-
-            printf("Echo: %lu us | Distance: %lu.%02lu cm\r\n",
-                   (unsigned long)pulse_us,
-                   (unsigned long)(distance_centi_cm / 100U),
-                   (unsigned long)(distance_centi_cm % 100U));
-        }
-        else
-        {
-            printf("No valid echo detected\r\n");
+            ticks = echo_ticks;
+            echo_ready = 0;
+            new_echo = 1;
         }
 
-        // Toggle built-in LED
-        GPIOA->ODR ^= (1U << 5);
-        delay_ms(200);
+        // 2. Check Falling Edge Timeout
+        if(rising_detected &&
+           (uint32_t)(now - rising_ms) >= ECHO_TIMEOUT_MS)
+        {
+            rising_detected = 0;
+            pulse_timeout = 1;
+        }
+
+        // Restore interrupt state
+        __set_PRIMASK(primask);
+
+        // 3. Calculate Distance
+        if(new_echo)
+        {
+            last_valid_ms = now;
+
+            // Tick -> Time (us)
+            uint32_t echo_us =
+                (uint32_t)ticks * ECHO_TICK_US;
+
+            // Time -> Distance (cm)
+            float distance_cm = echo_us / 58.0f;
+
+            // USART2 Output
+            printf("Distance: %.2f cm\r\n", distance_cm);
+        }
+
+        // 4. Falling Edge Timeout Message
+        if(pulse_timeout)
+        {
+            printf("Timeout: No Falling Edge\r\n");
+        }
+
+        // 5. No Valid ECHO Timeout
+        if((uint32_t)(now - last_valid_ms)
+           >= NO_ECHO_TIMEOUT_MS)
+        {
+            last_valid_ms = now;
+
+            printf("Timeout: No valid ECHO\r\n");
+        }
     }
 }
+
+
+// ============== TIM4 INTERRUPT ==============
 
 void TIM4_IRQHandler(void)
 {
-    uint32_t falling_capture;
-    uint32_t width_ticks;
+    uint32_t flags = TIM4->SR;
 
-    // 1. Timer overflow flag
-    if (is_UIF(TIM4))
+    // 1. Timer Update Flag
+    if(flags & TIM_SR_UIF)
     {
-        clear_UIF(TIM4);
+        TIM4->SR = ~TIM_SR_UIF;
     }
 
-    // 2. Rising edge: Start measuring
-    if (is_CCIF(TIM4, IC_1))
+    // 2. Input Capture Overcapture
+    if(flags & (TIM_SR_CC1OF | TIM_SR_CC2OF))
     {
-        rising_capture = ICAP_read(ECHO_PIN, IC_1);
-        rising_seen = 1U;
+        rising_detected = 0;
 
+        // Clear overcapture and capture flags
+        TIM4->SR = ~(TIM_SR_CC1OF | TIM_SR_CC2OF |
+                     TIM_SR_CC1IF | TIM_SR_CC2IF);
+
+        return;
+    }
+
+    // 3. Rising Edge (Channel 1)
+    if(flags & TIM_SR_CC1IF)
+    {
+        rising_cnt = ICAP_read(ECHO_PIN, IC_1);
         clear_CCIF(TIM4, IC_1);
+
+        // Rising Edge detected
+        rising_detected = 1;
+
+        // Save Rising Edge time
+        rising_ms = msTicks;
     }
 
-    // 3. Falling edge: Finish measuring
-    if (is_CCIF(TIM4, IC_2))
+    // 4. Falling Edge (Channel 2)
+    if(flags & TIM_SR_CC2IF)
     {
-        falling_capture = ICAP_read(ECHO_PIN, IC_2);
+        falling_cnt = ICAP_read(ECHO_PIN, IC_2);
         clear_CCIF(TIM4, IC_2);
 
-        if (rising_seen)
+        if(rising_detected)
         {
-            // Correct one timer counter wrap
-            if (falling_capture >= rising_capture)
+            // Calculate HIGH duration
+            // 16-bit wraparound is handled
+            uint16_t diff =
+                (uint16_t)(falling_cnt - rising_cnt);
+
+            // Valid pulse width: 0 ~ 30 ms
+            if(diff > 0 && diff <= MAX_ECHO_TICKS)
             {
-                width_ticks = falling_capture - rising_capture;
-            }
-            else
-            {
-                width_ticks = timer_period_ticks - rising_capture
-                              + falling_capture;
+                echo_ticks = diff;
+                echo_ready = 1;
             }
 
-            // Ignore invalid pulse widths
-            if ((width_ticks > 0U) &&
-                ((width_ticks * ECHO_TICK_US) <= MAX_ECHO_US))
-            {
-                echo_ticks = width_ticks;
-                measurement_ready = 1U;
-            }
+            // Measurement finished
+            rising_detected = 0;
         }
-
-        rising_seen = 0U;
     }
 }
+

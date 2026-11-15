@@ -64,7 +64,7 @@ void setup(void){
 int main(void){
 
     setup();
-
+    
     while(1){
         // Servo control is handled by interrupts
     }

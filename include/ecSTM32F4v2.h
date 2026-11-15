@@ -32,8 +32,10 @@ Description      : STM32F411 Library for EC
 #include "ecPWM2.h"
 #include "ecStepper.h"
 #include "ecICAP2.h"
-//#include "ecADC2.h"
+#include "ecADC2.h"
 #include "ecUART2.h"
+#include "ecI2C2.h"
+#include "ecDHT11.h"
 
 // #define LED_PIN_NUCLEO 
 

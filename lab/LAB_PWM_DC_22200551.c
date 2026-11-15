@@ -24,7 +24,7 @@ Description      : LAB_PWM_DC - Smart Mini-Fan
 // Configuration
 #define PWM_PERIOD_US   1000     // 1 ms = 1 kHz
 #define MOTOR_DIR       LOW      // Fixed Motor Direction
-#define IR_NEAR_LEVEL   HIGH      // Sensor detects NEAR at LOW
+#define IR_NEAR_LEVEL   HIGH      // Light blocked: NEAR
 #define DEBOUNCE_MS     150
 
 // FSM States
