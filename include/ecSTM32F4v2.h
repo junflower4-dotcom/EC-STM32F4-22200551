@@ -17,6 +17,7 @@ Description      : STM32F411 Library for EC
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 // STM built-In Library
 #include "stm32f4xx.h"
 #include "stm32f411xe.h"
